@@ -1,25 +1,110 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Project 1"
+date: "21 janvier 2016"
+output: html_document
 ---
 
+#Loading and preprocessing the data
+Load data as stored on computer (could also be directly download from internet)
+Reformat date
+```{r, echo=FALSE}
+path<-"C:/Users/adrien.gainie/Documents/MOOC/Data Science/Reproductible Research/Week 1/Project/RepData_PeerAssessment1"
+setwd(path)
+```
+```{r}
+acty<-read.csv("activity.csv")
 
-## Loading and preprocessing the data
+acty$date<-as.Date(acty$date)
+```
+
+#Total number of steps per day
+First, install the dplyr (data transformation) and ggplot2 (graphics) packages if not installed. Then we calculate the total steps per day and plot a histogram of them. 
+```{r}
+if(!"ggplot2" %in%installed.packages())
+{install.packages("dplyr")}
+require(dplyr)
+acty_day<-tbl_df(acty)%>%
+  group_by(date)%>%
+  summarize(steps_total=sum(steps, na.rm=TRUE))
+
+if(!"ggplot2" %in%installed.packages())
+{install.packages("ggplot2")}
+require(ggplot2)
+qplot(steps_total, data=acty_day) + ggtitle("Distribution of total steps per days") + 
+  xlab("Number of steps per day")
+```
+
+Now let's see the mean and median of the total number of steps per day.
+
+```{r}
+mean(acty_day$steps_total, na.rm=TRUE)
+median(acty_day$steps_total, na.rm=TRUE)
+```
 
 
+#Average daily activity pattern
+First calculte the average number of steps per interval over all days. Then we can plot it. Lastly we report the interval for which the average number of steps is maximum.
+```{r}
+acty_interval<-tbl_df(acty)%>%
+  group_by(interval)%>%
+  summarize(steps_mean=mean(steps, na.rm=TRUE))
 
-## What is mean total number of steps taken per day?
+qplot(interval,steps_mean,  data=acty_interval, geom="line") + 
+  ggtitle("Average number of steps per intervals") + 
+  xlab("Interval") +ylab("Average Number of steps")
+
+#Interval which has the maximum number of steps on average accross all days
+acty_interval[acty_interval$steps_mean==max(acty_interval$steps_mean),"interval"]
+```
 
 
+#Inputing missing values
 
-## What is the average daily activity pattern?
+1. Number of missing values
+```{r}
+sum(is.na(acty$steps))
+```
 
 
+2. inputing data set and new histogram, mean and median
+```{r}
+date<-unique(acty$date[is.na(acty$steps)])
+inter<-unique(acty$interval[is.na(acty$steps)])
+acty_complete<-acty
+for (i in date){
+  for (j in inter){
+    acty_complete$steps[is.na(acty_complete$steps)==TRUE&acty_complete$interval==j&acty_complete$date==i]<-acty_interval$steps_mean[acty_interval$interval==j]
+           }
+}
 
-## Imputing missing values
+acty_day_comp<-tbl_df(acty_complete)%>%
+  group_by(date)%>%
+  summarize(steps_total=sum(steps, na.rm=TRUE))
 
+qplot(steps_total, data=acty_day_comp) + ggtitle("Distribution of total steps per days") + 
+  xlab("Number of steps per day")
 
+mean(acty_day_comp$steps_total)
 
-## Are there differences in activity patterns between weekdays and weekends?
+median(acty_day_comp$steps_total)
+```
+
+The mean and median are higher when we input the missing values. This is because missing values are treated as 0 by the sum function.
+
+#Differences in activity patterns between weekdays and weekends
+
+Let's plot the difference in activity patterns between weekdays and weekends.
+First let's create a factor variable that says if the day is a weekday or a weekend. Then we can plot it using qplot and the option facets.
+
+```{r}
+days<-c("'lundi", "mardi", "mercredi", "jeudi", "vendredi")
+acty_complete$day_type<-as.factor(ifelse(weekdays(acty_complete$date)%in%days, "weekday", "weekend"))
+
+acty_inter_comp_mean<-tbl_df(acty_complete)%>%
+  group_by(interval, day_type)%>%
+  summarize(steps_mean=mean(steps, na.rm=TRUE))
+
+qplot(interval,steps_mean, facets=day_type~., data=acty_inter_comp_mean, geom = "line") + 
+  ggtitle("Average number of steps per type of days per interval") + 
+  xlab("Interval")+ylab("Average number of steps")
+```
